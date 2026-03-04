@@ -13,9 +13,9 @@
 
 //72MHz default clock speed
 
-void delayBusyMS(uint32_t N);
+void delayStkMs(uint32_t ms);
 
-void delayStkBusyUS(uint32_t N);
+void delayStkUs(uint32_t us);
 
 void delayStkBusyMS(uint32_t N);
 

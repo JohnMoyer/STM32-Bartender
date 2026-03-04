@@ -7,36 +7,26 @@
 
 #include <stdint.h>
 #include "delay.h"
-#include "regaddr.h"
+#include "stm32f103x6.h"
 
 
-#define STK ((stk_t*) STK_BASE)
-
-void delayBusyMS(uint32_t N) {
-	for(uint32_t i=0; i<N*DELAY_MS; i++);
+void delayStkUs(uint32_t us) {
+    SysTick->LOAD = 8 - 1;
+    SysTick->VAL  = 0;
+    SysTick->CTRL = 5;
+    for (uint32_t i = 0; i < us; i++) {
+        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
+    }
+    SysTick->CTRL = 0;
 }
 
-void delayStkBusyUS(uint32_t N) {
-    uint32_t reload = (8 * N) - 1;
-    if (reload > 0xFFFFFF) return;
 
-    STK->CTRL = 0b101;
-    STK->LOAD = reload;
-    STK->VAL = 0;
-    STK->CTRL = 0b101; //8MHz
-
-    while(!(STK->CTRL & (1 << 16)));
-
-}
-
-void delayStkBusyMS(uint32_t N) {
-    uint32_t reload = (8000 * N) - 1;
-    if (reload > 0xFFFFFF) return;
-
-    STK->CTRL = 0b101;
-    STK->LOAD = reload;
-    STK->VAL = 0;
-    STK->CTRL = 0b101; //8MHz
-
-    while(!(STK->CTRL & (1 << 16)));
+void delayStkMs(uint32_t ms) {
+    SysTick->LOAD = 8000 - 1;
+    SysTick->VAL  = 0;
+    SysTick->CTRL = 5;
+    for (uint32_t i = 0; i < ms; i++) {
+        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
+    }
+    SysTick->CTRL = 0;
 }
