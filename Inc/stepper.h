@@ -14,4 +14,6 @@ void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir);
 
 void spinTest(void);
 
+void spinContinuous(void);
+
 #endif /* STEPPER_H_ */

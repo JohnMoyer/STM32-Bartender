@@ -32,9 +32,9 @@ void stepperInit(void) {
 
 static void step(void) {
     GPIOA->BSRR = GPIO_BSRR_BS1;   							// STEP high
-    delayStkUs(20);
+    delayStkUs(5);
     GPIOA->BSRR = GPIO_BSRR_BR1;   							// STEP low
-    delayStkUs(20);
+    delayStkUs(5);
 }
 
 void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir) {
@@ -62,4 +62,12 @@ void spinTest(void) {
 	}
 	delayStkMs(5000);										// pause between rotations
 	GPIOA->BSRR = GPIO_BSRR_BS2;							// EN high (disable driver)
+}
+
+void spinContinuous(void) {
+	GPIOA->BSRR = GPIO_BSRR_BR2;   							// EN low (enable driver)
+	for(;;) {
+		step();
+		delayStkMs(3);										// speed control
+	}														// EN high (disable driver)
 }

@@ -9,8 +9,9 @@
 
 int main(void) {
     stepperInit();
-    for(;;) {
-    	spinDegrees(360, 1000, CW);
-    	delayStkMs(2000);
-    }
+//    for(;;) {
+//    	spinDegrees(360, 1000, CW);
+//    	delayStkMs(2000);
+//    }
+    spinContinuous();
 }
