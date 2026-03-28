@@ -9,6 +9,10 @@
 #include "drinks.h"
 #include "stm32f103x6.h"
 
+/*
+ * Timers: TIM3 for debounce
+ */
+
 void initButtons() {
 	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN_Msk;
 	RCC->APB2ENR |= RCC_APB2ENR_AFIOEN_Msk;
@@ -65,7 +69,7 @@ void EXTI9_5_IRQHandler(void) {
 			//toggleLed(4);
 			TIM3->CNT = 0;
 			TIM3->SR &= ~TIM_SR_UIF;
-			TIM3->CR1 |= TIM_CR1_CEN;											//TIM4 IRQ will re-enable button
+			TIM3->CR1 |= TIM_CR1_CEN;											//TIM3 IRQ will re-enable button
 
 				}
 	}
