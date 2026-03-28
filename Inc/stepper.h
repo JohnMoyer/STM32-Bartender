@@ -1,4 +1,4 @@
-/*
+ /*
  * stepper.h
  *
  *  Created on: Mar 3, 2026
@@ -8,12 +8,14 @@
 #ifndef STEPPER_H_
 #define STEPPER_H_
 
-void stepperInit(void);
+extern void stepperInit(void);
 
-void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir);
+extern void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir);
 
-void spinTest(void);
+extern void moveMM(uint16_t MM, uint32_t tMS, uint8_t dir);
 
-void spinContinuous(void);
+extern void spinTest(void);
+
+extern void spinContinuous(void);
 
 #endif /* STEPPER_H_ */

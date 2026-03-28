@@ -9,24 +9,25 @@
 #include "delay.h"
 #include "stm32f103x6.h"
 
+#define CPU_FREQ 8000000UL
 
 void delayStkUs(uint32_t us) {
-    SysTick->LOAD = 8 - 1;
+    SysTick->LOAD = us - 1;
     SysTick->VAL  = 0;
-    SysTick->CTRL = 5;
-    for (uint32_t i = 0; i < us; i++) {
-        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
-    }
+    SysTick->CTRL = 0x1;
+
+    while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
+
     SysTick->CTRL = 0;
 }
 
-
 void delayStkMs(uint32_t ms) {
-    SysTick->LOAD = 8000 - 1;
+    SysTick->LOAD = (ms * 1000) - 1;
     SysTick->VAL  = 0;
-    SysTick->CTRL = 5;
-    for (uint32_t i = 0; i < ms; i++) {
-        while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
-    }
+    SysTick->CTRL = 0x1;
+
+    while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
+
+
     SysTick->CTRL = 0;
 }

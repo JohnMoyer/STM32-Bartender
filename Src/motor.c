@@ -6,14 +6,11 @@
  */
 
 
-#include "regaddr.h"
+#include "stm32f103x6.h"
 #include "motor.h"
 
-#define GPIOA ((gpio_t*) GPIOA_BASE)
-
 void motor_control_init() {
-    volatile uint32_t* rcc_apb2enr = (uint32_t*) RCC_APB2ENR;
-    *rcc_apb2enr |= (0b1 << 2);
+    RCC->APB2ENR |= (0b1 << 2);
 
     //PA0 for motor
     GPIOA->CRL &= ~(0xF << 0);
