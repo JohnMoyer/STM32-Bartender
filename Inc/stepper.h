@@ -8,6 +8,10 @@
 #ifndef STEPPER_H_
 #define STEPPER_H_
 
+extern volatile uint32_t steps_remaining;
+
+extern volatile uint32_t steps_total;
+
 extern void stepperInit(void);
 
 extern void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir);

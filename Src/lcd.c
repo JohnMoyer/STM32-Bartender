@@ -5,7 +5,6 @@
  *      Author: John Moyer
  */
 
-
 #include <stdint.h>
 #include "i2c.h"
 #include "lcd.h"
@@ -13,101 +12,96 @@
 
 #define LCD_ADDR 0x27
 
-// PCF8574 pin mapping
-#define LCD_BACKLIGHT 		0x08
-#define LCD_EN 				0x04  // Enable bit
-#define LCD_RW 				0x02  // Read/Write bit
-#define LCD_RS 				0x01  // Register select bit
+#define LCD_BACKLIGHT       0x08
+#define LCD_EN              0x04
+#define LCD_RW              0x02
+#define LCD_RS              0x01
 
-// Commands
-#define LCD_CLEAR 			0x01
-#define LCD_HOME 			0x02
-#define LCD_ENTRY_MODE 		0x04
+#define LCD_CLEAR           0x01
+#define LCD_HOME            0x02
+#define LCD_ENTRY_MODE      0x04
 #define LCD_DISPLAY_CONTROL 0x08
-#define LCD_FUNCTION_SET 	0x20
+#define LCD_FUNCTION_SET    0x20
 
-// Send 4 bits to LCD
+// Non-blocking queue functions
+static void lcd_queue_nibble(uint8_t nibble, uint8_t mode) {
+    uint8_t data = nibble | mode | LCD_BACKLIGHT;
+    i2c_queue_byte(LCD_ADDR, data | LCD_EN, 0);
+    i2c_queue_byte(LCD_ADDR, data & ~LCD_EN, 50);
+}
+
+static void lcd_queue_byte_nb(uint8_t byte, uint8_t mode) {
+    lcd_queue_nibble(byte & 0xF0, mode);
+    lcd_queue_nibble((byte << 4) & 0xF0, mode);
+}
+
+void lcd_progress_bar(uint32_t current, uint32_t total) {
+    // 16 block characters = full bar
+	if (total == 0) return;
+    uint8_t filled = (current * 16) / total;
+
+    lcd_set_cursor_nb(1, 0);
+    for (uint8_t i = 0; i < 16; i++) {
+        if (i < filled) {
+            lcd_queue_byte_nb(0xFF, LCD_RS);  // full block character
+        } else {
+            lcd_queue_byte_nb(' ', LCD_RS);   // empty
+        }
+    }
+}
+
+void lcd_print_nb(const char* str) {
+    while (*str) {
+        lcd_queue_byte_nb(*str++, LCD_RS);
+    }
+}
+
+void lcd_clear_nb(void) {
+    lcd_queue_byte_nb(LCD_CLEAR, 0);
+    i2c_queue_byte(LCD_ADDR, LCD_BACKLIGHT, 2000);
+}
+
+void lcd_set_cursor_nb(uint8_t row, uint8_t col) {
+    uint8_t row_offsets[] = {0x00, 0x40};
+    lcd_queue_byte_nb(0x80 | (col + row_offsets[row]), 0);
+    i2c_queue_byte(LCD_ADDR, LCD_BACKLIGHT, 500);
+}
+
+// Blocking functions for lcd_init only
 static void lcd_send_nibble(uint8_t nibble, uint8_t mode) {
     uint8_t data = nibble | mode | LCD_BACKLIGHT;
-
     i2c_start();
     i2c_send_address(LCD_ADDR, I2C_WRITE);
-
-    // Send with E high
     i2c_write_data(data | LCD_EN);
     delayStkMs(1);
-
-    // Send with E low (falling edge latches data)
     i2c_write_data(data & ~LCD_EN);
     delayStkMs(1);
-
     i2c_stop();
 }
 
-// Send a byte (command or data)
 static void lcd_send_byte(uint8_t byte, uint8_t mode) {
-    uint8_t high_nibble = (byte & 0xF0);
-    uint8_t low_nibble = (byte << 4) & 0xF0;
-
-    lcd_send_nibble(high_nibble, mode);
-    lcd_send_nibble(low_nibble, mode);
+    lcd_send_nibble(byte & 0xF0, mode);
+    lcd_send_nibble((byte << 4) & 0xF0, mode);
 }
 
-// Send command
-void lcd_command(uint8_t cmd) {
-    lcd_send_byte(cmd, 0);  // RS=0 for command
+static void lcd_command(uint8_t cmd) {
+    lcd_send_byte(cmd, 0);
     delayStkMs(2);
 }
 
-// Send data (character)
-void lcd_data(uint8_t data) {
-    lcd_send_byte(data, LCD_RS);  // RS=1 for data
-    delayStkMs(1);
-}
-
-// Initialize LCD
 void lcd_init(void) {
-    delayStkMs(50);  // Wait for LCD to power up
-
-    // Initialize in 4-bit mode (special sequence)
+    delayStkMs(50);
     lcd_send_nibble(0x30, 0);
     delayStkMs(5);
     lcd_send_nibble(0x30, 0);
     delayStkMs(1);
     lcd_send_nibble(0x30, 0);
     delayStkMs(1);
-    lcd_send_nibble(0x20, 0);  // Set to 4-bit mode
+    lcd_send_nibble(0x20, 0);
     delayStkMs(1);
-
-    // Function set: 4-bit, 2 lines, 5x8 dots
     lcd_command(LCD_FUNCTION_SET | 0x08);
-
-    // Display control: Display on, cursor off, blink off
     lcd_command(LCD_DISPLAY_CONTROL | 0x04);
-
-    // Clear display
     lcd_command(LCD_CLEAR);
     delayStkMs(2);
-
-    // Entry mode: Increment cursor, no shift
     lcd_command(LCD_ENTRY_MODE | 0x02);
-}
-
-// Clear screen
-void lcd_clear(void) {
-    lcd_command(LCD_CLEAR);
-    delayStkMs(2);
-}
-
-// Set cursor position
-void lcd_set_cursor(uint8_t row, uint8_t col) {
-    uint8_t row_offsets[] = {0x00, 0x40};
-    lcd_command(0x80 | (col + row_offsets[row]));
-}
-
-// Print string
-void lcd_print(const char* str) {
-    while(*str) {
-        lcd_data(*str++);
-    }
 }

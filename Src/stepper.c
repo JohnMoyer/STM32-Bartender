@@ -5,16 +5,32 @@
  *      Author: moyerjf
  */
 
-#include "stm32f103x6.h"
+#include "stm32f103xb.h"
 #include "delay.h"
 
 /*
  * Convert to use interrupts from timer 2. 8MHz clock.
  */
 
+typedef enum {
+	STEPPER_IDLE,
+	STEPPER_RAMP_UP,
+	STEPPER_CRUISE,
+	STEPPER_RAMP_DOWN
+} StepperState;
+
 #define STEPS_PER_REVOLUTION 1600
-#define STEPS_PER_MMX100 3400
+#define STEPS_PER_MMX100 4038
 #define STEP_PULSE_US 5
+
+volatile uint32_t steps_remaining = 0;
+volatile uint32_t steps_total	 = 0;
+static volatile uint32_t ramp_steps 	 = 0;
+static volatile uint32_t min_arr 		 = 0;			    //fastest
+static volatile uint32_t max_arr 		 = 0;				//slowest
+static volatile StepperState state 		 = STEPPER_IDLE;
+volatile uint8_t stepper_done 			 = 0;
+
 
 void stepperInit(void) {
     RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;  					// enable GPIOA clock
@@ -24,9 +40,9 @@ void stepperInit(void) {
     GPIOA->CRL |= GPIO_CRL_MODE3_0 | GPIO_CRL_MODE3_1;
 
     TIM2->PSC = 8 - 1;
-    TIM2->ARR = 1000 - 1;
+    TIM2->ARR = 1000 - 1;									//Default 1ms period, overwritten later
     TIM2->DIER |= TIM_DIER_UIE_Msk;
-    TIM2->CR1 |= TIM_CR1_CEN_Msk;
+    TIM2->CR1 &= ~TIM_CR1_CEN_Msk;
 
     NVIC->ISER[0] |= (1 << TIM2_IRQn);
 
@@ -44,67 +60,100 @@ void stepperInit(void) {
     GPIOA->ODR |= GPIO_ODR_ODR2_Msk;   						// EN high (disable driver)
 
     GPIOA->BSRR = GPIO_BSRR_BS0;   							// DIR high - CCW when looking at motor head-on
+
 }
 
 
-static void step(void) {
-    GPIOA->BSRR = GPIO_BSRR_BS1;   							// STEP high
-    delayStkUs(STEP_PULSE_US);
-    GPIOA->BSRR = GPIO_BSRR_BR1;   							// STEP low
-    delayStkUs(STEP_PULSE_US);
-}
-
-static void runSteps(uint32_t steps, uint32_t delayUs)
-{
-    GPIOA->BSRR = GPIO_BSRR_BR2;
-    delayStkUs(100);
-
-    for(uint32_t i=0;i<steps;i++){
-        step();
-        delayStkUs(delayUs);
-    }
-
-    GPIOA->BSRR = GPIO_BSRR_BS2;
-}
-
-
-void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir) {
-	//Dir: 1 is CCW, 0 is CW
-	GPIOA->BSRR = dir ? GPIO_BSRR_BS0 : GPIO_BSRR_BR0;
-
-	uint32_t steps = (degrees * STEPS_PER_REVOLUTION) / 360;
+static void startMove(uint32_t steps, uint32_t delayUs, uint8_t dir) {
 	if (steps == 0) return;
 
-	uint32_t delayUs = (tMS * 1000) / steps;
+	GPIOA->BSRR = dir ? GPIO_BSRR_BS0 : GPIO_BSRR_BR0;
 
-	runSteps(steps, delayUs);                         	// EN high (disable driver)
+	EXTI->IMR &= ~(EXTI_IMR_MR8 | EXTI_IMR_MR9);			//turn off buttons while moving
+
+	steps_total = steps;
+	steps_remaining = steps;
+	ramp_steps = steps / 5;
+	if (ramp_steps < 1) ramp_steps = 1;
+
+	min_arr = delayUs - 1;									//cruise ARR
+	max_arr = (delayUs * 4) - 1;							//slow ARR
+
+	state = STEPPER_RAMP_UP;
+	stepper_done = 0;
+
+	GPIOA->BSRR = GPIO_BSRR_BR2;							//EN low (enable driver)
+
+	TIM2->ARR = max_arr;
+	TIM2->CNT = 0;
+	TIM2->CR1 |= TIM_CR1_CEN_Msk;
 }
-
 
 void moveMM(uint16_t MM, uint32_t tMS, uint8_t dir) {
-															//Dir: 1 is CCW, 0 is CW
-	GPIOA->BSRR = dir ? GPIO_BSRR_BS0 : GPIO_BSRR_BR0;
-
 	uint32_t steps = (MM * STEPS_PER_MMX100) / 100;
-	if (steps == 0) return;
-
 	uint32_t delayUs = (tMS * 1000) / steps;
-
-	runSteps(steps, delayUs);
+	startMove(steps, delayUs, dir);
 }
 
-
-void spinContinuous(void) {
-	GPIOA->BSRR = GPIO_BSRR_BR2;   							// EN low (enable driver)
-	for(;;) {
-		step();
-		delayStkUs(3000);										// speed control
-	}														// EN high (disable driver)
+void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir) {
+	uint32_t steps = (degrees * STEPS_PER_REVOLUTION) / 360;
+	uint32_t delayUs = (tMS * 1000) / steps;
+	startMove(steps, delayUs, dir);
 }
+
+//void TIM2_IRQHandler(void) {
+//	if (TIM2->SR & TIM_SR_UIF) {
+//		TIM2->SR &= ~TIM_SR_UIF;
+//		GPIOA->ODR ^= GPIO_ODR_ODR3;
+//	}
+//}
 
 void TIM2_IRQHandler(void) {
-	if (TIM2->SR & TIM_SR_UIF) {
-		TIM2->SR &= ~TIM_SR_UIF;
-		GPIOA->ODR ^= GPIO_ODR_ODR3;
-	}
+    if (!(TIM2->SR & TIM_SR_UIF)) return;
+    TIM2->SR &= ~TIM_SR_UIF;
+
+    if (steps_remaining == 0) {
+        TIM2->CR1 &= ~TIM_CR1_CEN_Msk;     // stop timer
+        GPIOA->BSRR = GPIO_BSRR_BS2;       // EN high (disable)
+        state        = STEPPER_IDLE;
+        stepper_done = 1;
+        return;
+    }
+
+    // Generate step pulse
+    GPIOA->BSRR = GPIO_BSRR_BS1;
+    delayStkUs(5);  // ~5us pulse at 8MHz
+    GPIOA->BSRR = GPIO_BSRR_BR1;
+
+    uint32_t steps_done = steps_total - steps_remaining;
+    steps_remaining--;
+
+    // Update ARR for trapezoidal profile
+    if (steps_done < ramp_steps) {
+        // Ramp up
+        uint32_t arr = max_arr - ((max_arr - min_arr) * steps_done / ramp_steps);
+        TIM2->ARR = arr;
+        state = STEPPER_RAMP_UP;
+    } else if (steps_remaining < ramp_steps) {
+        // Ramp down
+        uint32_t arr = max_arr - ((max_arr - min_arr) * steps_remaining / ramp_steps);
+        TIM2->ARR = arr;
+        state = STEPPER_RAMP_DOWN;
+    } else {
+        // Cruise
+        TIM2->ARR = min_arr;
+        state = STEPPER_CRUISE;
+    }
+
+    if (steps_remaining == 0) {								//Move is done
+        TIM2->CR1 &= ~TIM_CR1_CEN_Msk;
+        GPIOA->BSRR = GPIO_BSRR_BS2;
+        state        = STEPPER_IDLE;
+        stepper_done = 1;
+
+        // Re-enable buttons
+        EXTI->PR  = EXTI_PR_PR8 | EXTI_PR_PR9;   // clear any pending
+        EXTI->IMR |= EXTI_IMR_MR8 | EXTI_IMR_MR9;
+        return;
+    }
 }
