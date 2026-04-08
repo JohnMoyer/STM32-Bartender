@@ -44,6 +44,12 @@ void stepperInit(void) {
     TIM2->DIER |= TIM_DIER_UIE_Msk;
     TIM2->CR1 &= ~TIM_CR1_CEN_Msk;
 
+    TIM2->SR = 0;
+    NVIC_ClearPendingIRQ(TIM2_IRQn);
+    stepper_done = 0;
+    steps_remaining = 0;
+    steps_total = 0;
+
     NVIC->ISER[0] |= (1 << TIM2_IRQn);
 
     // PA0 (DIR), PA1 (STEP), PA2 (ENABLE) as output push-pull 50MHz
