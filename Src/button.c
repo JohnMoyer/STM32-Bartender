@@ -24,8 +24,7 @@ void initButtons() {
 
 
 	GPIOB->CRH &= ~(0xFF);								//Clear 8 and 9, MODE00 is input so keep
-	//GPIOB->CRH |= (GPIO_CRH_CNF9_1 | GPIO_CRH_CNF8_1);	//CNF1 (0b10) is input with pull up/down
-	GPIOB->CRH |= (GPIO_CRH_CNF9_0 | GPIO_CRH_CNF8_0);		//Floating input
+	GPIOB->CRH |= (0x88 << GPIO_CRH_MODE8_Pos);			//Pins 8 and 9 are input with pull up/down
 	GPIOB->ODR |= 0b11 << GPIO_ODR_ODR8_Pos;			//Pull up resistors for B8 and B9
 
 	AFIO->EXTICR[2] |= (0x01 << AFIO_EXTICR3_EXTI8_PB_Pos);
@@ -34,11 +33,6 @@ void initButtons() {
 	EXTI->RTSR &= ~(0b11 << EXTI_RTSR_TR8_Pos);
 	EXTI->FTSR |= (0b11 << EXTI_FTSR_TR8_Pos);
 	EXTI->IMR  |= (0b11 << EXTI_IMR_MR8_Pos);
-
-    TIM3->PSC = 8 - 1;
-    TIM3->ARR = 20000 - 1;								//20ms period for TIM3
-    TIM3->DIER |= TIM_DIER_UIE_Msk;
-    TIM3->CR1 &= ~TIM_CR1_CEN_Msk;
 
 	NVIC->ISER[0] |= (1 << EXTI9_5_IRQn);
 }

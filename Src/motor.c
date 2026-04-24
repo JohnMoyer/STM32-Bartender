@@ -9,7 +9,7 @@
 #include "stm32f103xb.h"
 #include "motor.h"
 
-volatile uint8_t active_motor = 0xFF;
+volatile uint8_t active_motor = 0xFE;	//0xFE is startup state
 
 void motor_control_init() {
 	//Output pins PA3 and PA4 for pump motors
@@ -24,8 +24,6 @@ void motor_control_init() {
     TIM3->CR1 &= ~TIM_CR1_CEN_Msk;
 
     NVIC_EnableIRQ(TIM3_IRQn);
-
-    active_motor = 0xFF;
 
     motor_off(0);
     motor_off(1);
@@ -68,11 +66,13 @@ void motor_run_ms(uint8_t motorIndex, uint32_t ms) {
 void TIM3_IRQHandler(void) {
     if (TIM3->SR & TIM_SR_UIF) {
         TIM3->SR &= ~TIM_SR_UIF;
-        TIM3->CR1 &= ~TIM_CR1_CEN;   // stop timer
-
+        TIM3->CR1 &= ~TIM_CR1_CEN;
         if (active_motor != 0xFF) {
             motor_off(active_motor);
             active_motor = 0xFF;
         }
+        // Re-enable buttons
+        EXTI->PR  = EXTI_PR_PR8 | EXTI_PR_PR9;
+        EXTI->IMR |= EXTI_IMR_MR8 | EXTI_IMR_MR9;
     }
 }

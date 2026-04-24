@@ -94,7 +94,7 @@ int i2c_send_address(uint8_t address, uint8_t direction) {
     I2C1->DR = (address << 1) | direction;
     while (!(I2C1->SR1 & I2C_SR1_ADDR));
     (void)I2C1->SR1;
-    (void)I2C1->SR2;
+    (void)I2C1->SR2;	//A read of SR2 after a read of SR1 clears ADDR flag
     return 0;
 }
 

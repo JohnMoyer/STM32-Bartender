@@ -6,25 +6,53 @@
 #include "ledtest.h"
 #include "button.h"
 #include "motor.h"
-
+#include "drinks.h"
 #include "stm32f103xb.h"
-
-//15mm diameter for drive gear
-
-/*
- * Timers:
- * TIM2: Stepper motor timing steps
- * TIM3: Pump motor timer
- */
-
 #define CCW 1
-#define CW 0
+#define CW  0
+#define ONE_SECOND 1000
+#define ONE_AND_HALF_SECOND 1500
+#define TWO_SECOND 2000
+#define THREE_SECOND 3000
 
-extern volatile uint8_t stepper_done;
-static volatile uint8_t btn8 = 0;
-static volatile uint8_t btn9 = 0;
+extern volatile uint8_t  stepper_done;
 extern volatile uint32_t steps_remaining;
 extern volatile uint32_t steps_total;
+extern volatile uint8_t active_motor;
+
+
+static volatile uint8_t btn8 = 0;
+static volatile uint8_t btn9 = 0;
+
+typedef enum {
+    STATE_IDLE,
+    STATE_POURING,
+    STATE_MOVING_TO_NEXT,
+    STATE_RETURNING_HOME
+} MachineState;
+
+static MachineState state         = STATE_IDLE;
+static uint8_t      selected_drink = 0;
+static uint8_t      current_ingredient = 0;
+static uint32_t     bar_counter   = 0;
+static uint16_t     current_pos_mm = 0;  // track position from home
+
+static void update_progress_bar(void) {
+    bar_counter++;
+    if (bar_counter >= 5000) {
+        bar_counter = 0;
+        lcd_progress_bar(steps_total - steps_remaining, steps_total);
+    }
+}
+
+static void show_idle_screen(void) {
+    i2c_clear_queue();
+    lcd_clear_nb();
+    lcd_set_cursor_nb(0, 0);
+    lcd_print_nb(drink_menu[selected_drink].name);
+    lcd_set_cursor_nb(1, 0);
+    lcd_print_nb("Pour      Next>>");
+}
 
 int main(void) {
     initLed();
@@ -34,95 +62,122 @@ int main(void) {
     initButtons();
     motor_control_init();
 
-    i2c_clear_queue();
-    lcd_clear_nb();
-    lcd_set_cursor_nb(0, 0);
-    lcd_print_nb("Red: 30cm right");
-    lcd_set_cursor_nb(1, 0);
-    lcd_print_nb("Blue: 30cm left");
 
-    static uint32_t bar_counter = 0;
-    static uint8_t moving = 0;
-    static uint8_t pourStep = 0;
+    show_idle_screen();
 
     for(;;) {
         i2c_process();
 
-        if (btn8) {
-        	pourStep = 1;
+        // btn8 = cycle through drinks
+        if (btn8 && state == STATE_IDLE) {
             btn8 = 0;
-            moving = 1;
-            i2c_clear_queue();
-            moveMM(300, 1500, CW);
-            lcd_clear_nb();
-            lcd_set_cursor_nb(0, 0);
-            lcd_print_nb("Moving right");
-            //motor_on(0);
+            selected_drink = (selected_drink + 1) % num_drinks;
+            show_idle_screen();
+            EXTI->PR  = EXTI_PR_PR8;
+            EXTI->IMR |= EXTI_IMR_MR8;
         }
-        if (btn9) {
+
+        // btn9 = start pouring sequence
+        if (btn9 && state == STATE_IDLE) {
             btn9 = 0;
-            moving = 1;
+            current_ingredient = 0;
+            state = STATE_MOVING_TO_NEXT;
+
+            const Ingredient* ing = &drink_menu[selected_drink].ingredients[0];
+            uint16_t dist = ing->position_mm - current_pos_mm;
+            uint8_t  dir  = (ing->position_mm > current_pos_mm) ? CW : CCW;
+
             i2c_clear_queue();
-            moveMM(300, 1500, CCW);
             lcd_clear_nb();
             lcd_set_cursor_nb(0, 0);
-            lcd_print_nb("Moving left");
-            motor_on(0);
+            lcd_print_nb("Moving...");
+            bar_counter = 0;
+
+            moveMM(dist, ONE_AND_HALF_SECOND, dir);
+
         }
 
-        if (moving && !stepper_done && steps_remaining > 50) {
-            bar_counter++;
-            if (bar_counter >= 5000) {
-                bar_counter = 0;
-                lcd_progress_bar(steps_total - steps_remaining, steps_total);
+        // Update progress bar while moving
+        if (state == STATE_MOVING_TO_NEXT || state == STATE_RETURNING_HOME) {
+            if (!stepper_done && steps_remaining > 50) {
+                update_progress_bar();
             }
         }
 
-        if (pourStep == 2 && active_motor == 0xFF) {
-        	moveMM(300, 1500, CCW);
-        	pourStep = 0;
+        if (state == STATE_POURING) {
+            if (stepper_done) {
+            	stepper_done = 0;
+                // Pour finished
+                const Drink* drink = &drink_menu[selected_drink];
+                current_ingredient++;
+
+                if (current_ingredient < drink->num_ingredients) {
+                    // Move to next ingredient
+                    state = STATE_MOVING_TO_NEXT;
+                    const Ingredient* ing = &drink->ingredients[current_ingredient];
+                    uint16_t dist = (ing->position_mm > current_pos_mm) ?
+                                    ing->position_mm - current_pos_mm :
+                                    current_pos_mm - ing->position_mm;
+                    uint8_t dir = (ing->position_mm > current_pos_mm) ? CW : CCW;
+
+                    i2c_clear_queue();
+                    lcd_clear_nb();
+                    lcd_set_cursor_nb(0, 0);
+                    lcd_print_nb("Moving...");
+                    bar_counter = 0;
+                    moveMM(dist, ONE_AND_HALF_SECOND, dir);
+                } else {
+                    // All ingredients done - return home
+                    state = STATE_RETURNING_HOME;
+                    i2c_clear_queue();
+                    lcd_clear_nb();
+                    lcd_set_cursor_nb(0, 0);
+                    lcd_print_nb("Returning...");
+                    bar_counter = 0;
+                    moveMM(current_pos_mm, TWO_SECOND, CCW);
+                }
+            }
         }
 
-        if (stepper_done) {
+        if (stepper_done && state != STATE_IDLE && state != STATE_POURING) {
             stepper_done = 0;
-            moving = 0;
-            if (pourStep == 1) {
-            	pourStep = 2;
-            	motor_run_ms(0, 5000);
+
+            const Ingredient* ing = &drink_menu[selected_drink].ingredients[current_ingredient];
+
+            if (state == STATE_RETURNING_HOME) {
+                current_pos_mm = 0;
+                state = STATE_IDLE;
+                show_idle_screen();
+            } else {
+                // Arrived at ingredient - update position and start pouring
+                current_pos_mm = ing->position_mm;
+                state = STATE_POURING;
+
+                i2c_clear_queue();
+                lcd_clear_nb();
+                lcd_set_cursor_nb(0, 0);
+                lcd_print_nb("Pouring...");
+
+                pourDrink(ing->motor_id, ing->pour_ms);
             }
-
-
-            EXTI->IMR |= EXTI_IMR_MR8 | EXTI_IMR_MR9;  // re-enable both
-            i2c_clear_queue();
-            lcd_clear_nb();
-            lcd_set_cursor_nb(0, 0);
-            lcd_print_nb("Red: 30cm right");
-            lcd_set_cursor_nb(1, 0);
-            lcd_print_nb("Blue: 30cm left");
         }
     }
 }
-/* B8 and B9 are the buttons to be used
- * B8: toggle through drink menu
- * B9: Start drink sequence
- * TIM3: debounce
- */
+
 void EXTI9_5_IRQHandler(void) {
-
-	if (EXTI->PR & EXTI_PR_PR8) {  								//PB8
-		EXTI->PR = EXTI_PR_PR8;													//Clear flag
-		if (!(GPIOB->IDR & (1 << EXTI_PR_PR8_Pos))) {							//Press occurred
-			EXTI->IMR &= ~EXTI_IMR_MR8;											//Button off
-			btn8 = 1;
-		}
-	}
-
-	if (EXTI->PR & EXTI_PR_PR9) {
-		EXTI->PR = EXTI_PR_PR9;													//Clear flag
-		if (!(GPIOB->IDR & (1 << EXTI_PR_PR9_Pos))) {							//Press occurred
-			EXTI->IMR &= ~EXTI_IMR_MR9;											//Button off
-			btn9 = 1;
-		}
-	}
+    if (EXTI->PR & EXTI_PR_PR8) {
+        EXTI->PR = EXTI_PR_PR8;
+        if (!(GPIOB->IDR & (1 << EXTI_PR_PR8_Pos))) {
+            EXTI->IMR &= ~EXTI_IMR_MR8;
+            btn8 = 1;
+        }
+    }
+    if (EXTI->PR & EXTI_PR_PR9) {
+        EXTI->PR = EXTI_PR_PR9;
+        if (!(GPIOB->IDR & (1 << EXTI_PR_PR9_Pos))) {
+            EXTI->IMR &= ~EXTI_IMR_MR9;
+            btn9 = 1;
+        }
+    }
 }
 
