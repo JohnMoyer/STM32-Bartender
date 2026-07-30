@@ -20,8 +20,10 @@ typedef enum {
 	STEPPER_RAMP_DOWN
 } StepperState;
 
-#define STEPS_PER_REVOLUTION 1600
+#define STEPS_PER_REV_CONVEYOR 1600
+#define STEPS_PER_REV_PUMP 200
 #define STEPS_PER_MMX100 4038
+#define POUR_ARR 1799
 #define STEP_PULSE_US 5
 
 volatile uint32_t steps_remaining = 0;
@@ -39,6 +41,7 @@ void stepperInit(void) {
 
     RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;  					// enable GPIOA clock
     RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
+    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
     GPIOA->CRL &= ~(GPIO_CRL_CNF3 | GPIO_CRL_MODE3);
     GPIOA->CRL |= GPIO_CRL_MODE3_0 | GPIO_CRL_MODE3_1;
@@ -95,13 +98,15 @@ static void startMove(uint32_t steps, uint32_t delayUs, uint8_t dir) {
 	TIM2->CR1 |= TIM_CR1_CEN_Msk;
 
     TIM3->PSC = 8000 - 1;
+    TIM3->EGR  = TIM_EGR_UG;   // latch PSC immediately
+    TIM3->SR   = 0;             // clear flag set by EGR
     TIM3->DIER |= TIM_DIER_UIE_Msk;
     TIM3->CR1 &= ~TIM_CR1_CEN_Msk;
 
     NVIC_EnableIRQ(TIM3_IRQn);
 }
 
-static void startMoveSteady(uint32_t steps, uint32_t delayUs, uint8_t dir) {
+static void startPour(uint32_t steps, uint8_t dir) {
     if (steps == 0) return;
 
     GPIOA->BSRR = dir ? GPIO_BSRR_BS0 : GPIO_BSRR_BR0;
@@ -110,19 +115,29 @@ static void startMoveSteady(uint32_t steps, uint32_t delayUs, uint8_t dir) {
 
     steps_total     = steps;
     steps_remaining = steps;
-    ramp_steps      = 0;        // no ramp
+    ramp_steps      = 1;        //no ramp
 
-    min_arr = delayUs - 1;
-    max_arr = delayUs - 1;      // same as min, no ramp range needed
+//    min_arr = delayUs - 1;
+//    max_arr = delayUs - 1;      //same as min, no ramp range needed
+    min_arr = POUR_ARR;
+    max_arr = POUR_ARR;
 
-    state        = STEPPER_CRUISE;  // start directly in cruise
+    state        = STEPPER_CRUISE;  //start directly in cruise
     stepper_done = 0;
 
     GPIOA->BSRR = GPIO_BSRR_BR2;
 
-    TIM2->ARR = min_arr;
+    TIM2->ARR = POUR_ARR;
     TIM2->CNT = 0;
     TIM2->CR1 |= TIM_CR1_CEN_Msk;
+
+    TIM3->PSC = 8000 - 1;
+    TIM3->EGR  = TIM_EGR_UG;   // latch PSC immediately
+    TIM3->SR   = 0;             // clear flag set by EGR
+    TIM3->DIER |= TIM_DIER_UIE_Msk;
+    TIM3->CR1 &= ~TIM_CR1_CEN_Msk;
+
+    NVIC_EnableIRQ(TIM3_IRQn);
 }
 
 void moveMM(uint16_t MM, uint32_t tMS, uint8_t dir) {
@@ -134,24 +149,29 @@ void moveMM(uint16_t MM, uint32_t tMS, uint8_t dir) {
 }
 
 void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir) {
-	uint32_t steps = (degrees * STEPS_PER_REVOLUTION) / 360;
+	uint32_t steps = (degrees * STEPS_PER_REV_CONVEYOR) / 360;
 	uint32_t delayUs = (tMS * 1000) / steps;
 	startMove(steps, delayUs, dir);
 }
 
-void pourDrink(uint8_t motor, uint32_t ms) {
+void pourDrink(uint8_t motor, uint32_t ms, uint8_t dir) {
 	selectStepper(motor);
 	enableSelector();
-	uint32_t steps = STEPS_PER_REVOLUTION * 20;
-	uint32_t delayUs = (ms * 1000) / steps;
-	startMoveSteady(steps, delayUs, 1);
+	startPour(0xFFFFFF, dir);
+
+	TIM3->ARR = ms - 1;
+	TIM3->CNT = 0;
+	TIM3->SR = 0;
+	TIM3->EGR = TIM_EGR_UG;  	 			//force update to latch PSC and ARR
+	TIM3->SR  = 0;             				//clear the update flag EGR just set
+	TIM3->CR1 |= TIM_CR1_CEN_Msk;
 }
 
 void TIM2_IRQHandler(void) {
     if (!(TIM2->SR & TIM_SR_UIF)) return;
     TIM2->SR &= ~TIM_SR_UIF;
 
-    if (steps_remaining == 0) {
+    if (steps_remaining == 0  && state != STEPPER_CRUISE) {
         TIM2->CR1 &= ~TIM_CR1_CEN_Msk;     // stop timer
         GPIOA->BSRR = GPIO_BSRR_BS2;       // EN high (disable)
         state        = STEPPER_IDLE;
@@ -184,7 +204,7 @@ void TIM2_IRQHandler(void) {
         state = STEPPER_CRUISE;
     }
 
-    if (steps_remaining == 0) {								//Move is done
+    if (steps_remaining == 0 && state != STEPPER_CRUISE) {								//Move is done
         TIM2->CR1 &= ~TIM_CR1_CEN_Msk;
         GPIOA->BSRR = GPIO_BSRR_BS2;
         state        = STEPPER_IDLE;
@@ -196,4 +216,22 @@ void TIM2_IRQHandler(void) {
         EXTI->IMR |= EXTI_IMR_MR8 | EXTI_IMR_MR9;
         return;
     }
+}
+void TIM3_IRQHandler(void) {
+    if (!(TIM3->SR & TIM_SR_UIF)) return;
+    TIM3->SR = ~TIM_SR_UIF;
+
+    TIM3->CR1 &= ~TIM_CR1_CEN_Msk;
+    TIM2->CR1 &= ~TIM_CR1_CEN_Msk;
+
+    GPIOA->BSRR = GPIO_BSRR_BR1;  // STEP low
+    GPIOA->BSRR = GPIO_BSRR_BS2;  // disable driver
+
+    disableSelector();
+
+    state        = STEPPER_IDLE;
+    stepper_done = 1;
+
+    EXTI->PR  = EXTI_PR_PR8 | EXTI_PR_PR9;
+    EXTI->IMR |= EXTI_IMR_MR8 | EXTI_IMR_MR9;
 }

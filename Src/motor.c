@@ -5,74 +5,100 @@
  *      Author: moyerjf
  */
 
+//Using Sparkfun TB303A1 motor driver to drive Ice Auger
+//https://www.sparkfun.com/sparkfun-motor-driver-dual-tb6612fng-1a.html
+
+/*
+ * Driver input pins:
+ * 	PA8 (TIM1 CH1 for PWM on ice motor): PWMA/B
+ * 	PA2: 								AI1/2
+ * 	PA3: 								BI1/2
+ * 	+5V: 								STBY
+ * Driver output pins:
+ * 	AO1/2 tied together
+ * 	BO1/2 tied together
+ *
+ * TIM4: runs motor for set ms
+ */
 
 #include "stm32f103xb.h"
 #include "motor.h"
 
-volatile uint8_t active_motor = 0xFE;	//0xFE is startup state
+#define OUTPUT_PUSH_PULL_PA2_PA3 		(0x33 << 8)
+#define ALT_FUNC_PUSH_PULL_PA8			(0xB << 0)
+#define PWM_MODE_1						(0x6 << 4)
 
-void motor_control_init() {
-	//Output pins PA3 and PA4 for pump motors
-	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN_Msk;
-	GPIOA->CRL &= ~(GPIO_CRL_CNF3 | GPIO_CRL_MODE3 |
-	                GPIO_CRL_CNF4 | GPIO_CRL_MODE4);
-	GPIOA->CRL |= (GPIO_CRL_MODE3_0 | GPIO_CRL_MODE3_1 |
-	               GPIO_CRL_MODE4_0 | GPIO_CRL_MODE4_1);
+#define PIN_IN1							(1 << 2)	//PA2
+#define PIN_IN2							(1 << 3)	//PA3
 
-    TIM3->PSC = 8000 - 1;
-    TIM3->DIER |= TIM_DIER_UIE_Msk;
-    TIM3->CR1 &= ~TIM_CR1_CEN_Msk;
 
-    NVIC_EnableIRQ(TIM3_IRQn);
+void motorControlInit() {
+	RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
+	RCC->APB2ENR |= (RCC_APB2ENR_IOPAEN | RCC_APB2ENR_TIM1EN);			//GPIOA and TIM1 RCC
 
-    motor_off(0);
-    motor_off(1);
+	GPIOA->CRL &= ~(0xFF << GPIO_CRL_MODE2_Pos);
+	GPIOA->CRL |= OUTPUT_PUSH_PULL_PA2_PA3;
+
+	GPIOA->CRH &= ~(0xF);
+	GPIOA->CRH |= ALT_FUNC_PUSH_PULL_PA8;
+
+	TIM4->PSC = 7999;
+	TIM4->ARR = 0xFFFF;
+	TIM4->EGR |= TIM_EGR_UG;
+	TIM4->SR &= ~(TIM_SR_UIF);
+
+	//16KHz PWM
+	TIM1->PSC = 0;
+	TIM1->ARR = 499;													//8MHz / 500 = 16KHz
+
+	TIM1->CCMR1 &= ~(TIM_CCMR1_OC1M);									//Clear out channel 1
+	TIM1->CCMR1 |= PWM_MODE_1 | TIM_CCMR1_OC1PE;
+
+	TIM1->CCER |= TIM_CCER_CC1E_Msk;
+	TIM1->BDTR |= TIM_BDTR_MOE_Msk;
+
+	TIM1->CR1 |= TIM_CR1_CEN_Msk;
+
+	GPIOA->BRR = (PIN_IN1 | PIN_IN2);
 }
 
-void motor_on(uint8_t motorIndex) {
-	switch (motorIndex) {
+void setMotorSpeed(uint8_t pct) {
+	if (pct > 100) pct = 100;
+
+	uint16_t duty = ((uint32_t) pct * 499 + 50) / 100;
+	TIM1->CCR1 = duty;
+
+}
+
+void motorOff() {
+	GPIOA->BRR = (PIN_IN1 | PIN_IN2);
+	TIM1->CCR1 = 0;
+}
+
+void motorRunMS(uint8_t dir, uint16_t ms) {
+	switch (dir) {
 	case 0:
-		GPIOA->BSRR = GPIO_BSRR_BS3;
-		break;
+		GPIOA->BSRR = PIN_IN1;
+		GPIOA->BRR = PIN_IN2;
+	break;
 	case 1:
-		GPIOA->BSRR = GPIO_BSRR_BS4;
-		break;
+		GPIOA->BRR = PIN_IN1;
+		GPIOA->BSRR = PIN_IN2;
+	break;
+	default:
+		GPIOA->BRR = (PIN_IN1 | PIN_IN2);
 	}
+
+	TIM4->CR1 &= ~TIM_CR1_CEN;
+	TIM4->CNT = 0;
+	TIM4->ARR = ms;
+	TIM4->SR &= ~TIM_SR_UIF;
+
+	TIM4->CR1 |= TIM_CR1_CEN;
+	while (!(TIM4->SR & TIM_SR_UIF));
+
+	TIM4->CR1 &= ~(TIM_CR1_CEN);
+	TIM4->SR &= ~TIM_SR_UIF;
+	motorOff();
 }
 
-void motor_off(uint8_t motorIndex) {
-	switch (motorIndex) {
-	case 0:
-		GPIOA->BSRR = GPIO_BSRR_BR3;
-		break;
-	case 1:
-		GPIOA->BSRR = GPIO_BSRR_BR4;
-		break;
-	}
-}
-
-void motor_run_ms(uint8_t motorIndex, uint32_t ms) {
-	active_motor = motorIndex;
-
-	motor_on(motorIndex);
-
-    TIM3->ARR = ms - 1;								//1ms period for TIM3
-
-    TIM3->CNT = 0;
-    TIM3->SR &= ~TIM_SR_UIF;
-    TIM3->CR1 |= TIM_CR1_CEN_Msk;
-}
-
-void TIM3_IRQHandler(void) {
-    if (TIM3->SR & TIM_SR_UIF) {
-        TIM3->SR &= ~TIM_SR_UIF;
-        TIM3->CR1 &= ~TIM_CR1_CEN;
-        if (active_motor != 0xFF) {
-            motor_off(active_motor);
-            active_motor = 0xFF;
-        }
-        // Re-enable buttons
-        EXTI->PR  = EXTI_PR_PR8 | EXTI_PR_PR9;
-        EXTI->IMR |= EXTI_IMR_MR8 | EXTI_IMR_MR9;
-    }
-}

@@ -10,15 +10,13 @@
 
 #include <stdint.h>
 
-extern volatile uint8_t active_motor;
+extern void motorControlInit();
 
-extern void motor_control_init();
+extern void motorOff();
 
-extern void motor_on(uint8_t motorIndex);
+extern void motorRunMS(uint8_t dir, uint16_t ms);
 
-extern void motor_off(uint8_t motorIndex);
-
-extern void motor_run_ms(uint8_t motorIndex, uint32_t ms);
+extern void setMotorSpeed(uint8_t pct);
 
 
 #endif /* MOTOR_H_ */

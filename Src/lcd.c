@@ -23,6 +23,11 @@
 #define LCD_DISPLAY_CONTROL 0x08
 #define LCD_FUNCTION_SET    0x20
 
+/*
+ * PB6: SCL
+ * PB7: SDA
+ */
+
 // Non-blocking queue functions
 static void lcd_queue_nibble(uint8_t nibble, uint8_t mode) {
     uint8_t data = nibble | mode | LCD_BACKLIGHT;

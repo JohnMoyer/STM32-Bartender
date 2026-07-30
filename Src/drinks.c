@@ -9,11 +9,11 @@
 
 const Drink drink_menu[] = {
     {
-        .name = "Bottles 1 & 2",
+        .name = "Jerry S.C.",
         .num_ingredients = 2,
         .ingredients = {
-            { .position_mm = 300, .motor_id = 1, .pour_ms = 1000 },
-            { .position_mm = 600, .motor_id = 2, .pour_ms = 2500 },
+            { .position_mm = 440, .motor_id = 1, .pour_ms = 1400 }, //14000
+            { .position_mm = 600, .motor_id = 2, .pour_ms = 4200 }, //42000
         }
     },
     {

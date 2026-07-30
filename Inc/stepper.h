@@ -18,7 +18,7 @@ extern void spinDegrees(uint16_t degrees, uint32_t tMS, uint8_t dir);
 
 extern void moveMM(uint16_t MM, uint32_t tMS, uint8_t dir);
 
-extern void pourDrink(uint8_t motor, uint32_t mm);
+extern void pourDrink(uint8_t motor, uint32_t mm, uint8_t dir);
 
 extern void spinTest(void);
 
