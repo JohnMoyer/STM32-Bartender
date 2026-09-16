@@ -11,10 +11,12 @@ build/
 *.list
 *.cfg
 *.launch
-.vscode/
 
 # IDE settings (optional - some people track these)
-.settings/
+.vscode/*
+
+!.vscode/launch.json
+!.vscode/settings.json
 
 # Generated files
 Drivers/CMSIS/
