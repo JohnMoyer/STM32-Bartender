@@ -4,7 +4,7 @@ Programming, electronics: **John Moyer**
 
 Physical designing: **Isaac Wolf, Talan Luedtke**
 - wolfi@msoe.edu
-- luedktket@msoe.edu
+- luedtket@msoe.edu
 
 ## Purpose
 
