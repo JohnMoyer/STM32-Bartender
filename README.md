@@ -12,18 +12,17 @@ TODO
 
 ## Build and run with VS Code and ST-Link
 
-This is a bare-metal STM32F103C8 (Blue Pill) project. It does not use STM32
+This is a bare-metal STM32F103C8T6 (Blue Pill) project. It does not use STM32
 HAL or CubeMX-generated code.
 
 ### Requirements
 
 - Visual Studio Code
 - The **STM32CubeIDE for Visual Studio Code** extension pack
-- The GNU Tools for STM32, CMake, Ninja, ST-Link GDB server, and programmer
-  bundles installed through the extension's Bundle Manager
+- The GNU Tools for STM32, CMake, Ninja, ST-Link GDB server, and programmer bundles installed through the extension's Bundle Manager
 - An ST-Link connected to the Blue Pill
 
-### ST-Link wiring
+#### ST-Link wiring
 
 | ST-Link | Blue Pill |
 | --- | --- |
@@ -47,8 +46,7 @@ The generated build files are placed in `build/debug`.
 
 ### Build
 
-The Build button supplied by the STM32 extension currently does not work for
-this manually configured project. Build from the VS Code terminal instead:
+If the `build` button provided by vscode does not work, this command will suffice:
 
 ```powershell
 cube-cmake --build --preset debug
@@ -69,14 +67,11 @@ Build the project using the command above, then:
 
 1. Connect and power the Blue Pill through the ST-Link.
 2. Open **Run and Debug** in VS Code.
-3. Select **STM32Cube: Launch ST-Link GDB Server**.
-4. Press `F5`.
-5. The debugger programs `build/debug/Bartender.elf` and stops at `main()`.
-6. Press `F5` again to continue running the firmware.
+3. Press `F5`.
+4. The debugger programs `build/debug/Bartender.elf` and stops at `main()`.
+5. Press `F5` again to continue running the firmware.
 
-The launch configuration intentionally references the ELF directly and does
-not use the extension's failing automatic pre-build action. Re-run the build
-command before pressing `F5` whenever source code changes.
+Re-run the build process before pressing `F5` whenever source code changes.
 
 ### Command-line flash without debugging
 
