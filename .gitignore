@@ -11,6 +11,7 @@ build/
 *.list
 *.cfg
 *.launch
+.vscode/*
 
 # IDE settings (optional - some people track these)
 .settings/
