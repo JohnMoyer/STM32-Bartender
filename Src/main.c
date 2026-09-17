@@ -7,17 +7,21 @@
 #include "button.h"
 #include "motor.h"
 #include "drinks.h"
+#include "valve.h"
 #include "stm32f103xb.h"
 
-#define CCW 1
-#define CW  0
-#define ONE_SECOND 1000
-#define ONE_AND_HALF_SECOND 1500
-#define TWO_SECOND 2000
-#define THREE_SECOND 3000
-#define PURGE_MS 3000
+#define CCW 					1
+#define CW  					0
+#define ONE_SECOND 				1000
+#define ONE_AND_HALF_SECOND 	1500
+#define TWO_SECOND 				2000
+#define THREE_SECOND 			3000
 
-#define ICE_MACHINE_MM 225
+#define PURGE_MS 				3000
+#define VALVE_MS 				4000
+
+#define ICE_MACHINE_MM 			225
+#define VALVE_1_MM 				533
 
 extern volatile uint8_t stepper_done;
 extern volatile uint32_t steps_remaining;
@@ -32,6 +36,7 @@ typedef enum {
     STATE_ICE_BREAK,      // CCW for 1 second
     STATE_ICE_DISPENSE,   // CW for 4 seconds
     STATE_POURING,
+	STATE_OPENING_VALVE,
     STATE_PURGING,
     STATE_MOVING_TO_NEXT,
     STATE_RETURNING_HOME
