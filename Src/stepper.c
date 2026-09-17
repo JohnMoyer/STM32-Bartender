@@ -28,6 +28,7 @@ typedef enum {
 
 volatile uint32_t steps_remaining = 0;
 volatile uint32_t steps_total	 = 0;
+static volatile uint32_t pour_duration_ms = 0;
 static volatile uint32_t ramp_steps 	 = 0;
 static volatile uint32_t min_arr 		 = 0;			    //fastest
 static volatile uint32_t max_arr 		 = 0;				//slowest
@@ -158,6 +159,7 @@ void pourDrink(uint8_t motor, uint32_t ms, uint8_t dir) {
 	selectStepper(motor);
 	enableSelector();
 	startPour(0xFFFFFF, dir);
+	pour_duration_ms = ms;
 
 	TIM3->ARR = ms - 1;
 	TIM3->CNT = 0;
@@ -165,6 +167,14 @@ void pourDrink(uint8_t motor, uint32_t ms, uint8_t dir) {
 	TIM3->EGR = TIM_EGR_UG;  	 			//force update to latch PSC and ARR
 	TIM3->SR  = 0;             				//clear the update flag EGR just set
 	TIM3->CR1 |= TIM_CR1_CEN_Msk;
+}
+
+uint32_t pourElapsedMs(void) {
+	return TIM3->CNT;
+}
+
+uint32_t pourDurationMs(void) {
+	return pour_duration_ms;
 }
 
 void TIM2_IRQHandler(void) {

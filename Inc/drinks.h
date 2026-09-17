@@ -19,6 +19,7 @@ typedef struct {
     const char* name;
     Ingredient  ingredients[4];  // max 4 ingredients
     uint8_t     num_ingredients;
+    uint8_t     includes_valve_1;
 } Drink;
 
 extern const Drink drink_menu[];

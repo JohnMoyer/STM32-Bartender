@@ -32,6 +32,7 @@ static volatile uint8_t btn9 = 0;
 
 typedef enum {
     STATE_IDLE,
+	STATE_MOVING_TO_VALVE,
 	STATE_MOVING_TO_ICE,
     STATE_ICE_BREAK,      // CCW for 1 second
     STATE_ICE_DISPENSE,   // CW for 4 seconds
@@ -48,11 +49,35 @@ static uint8_t current_ingredient = 0;
 static uint32_t bar_counter = 0;
 static uint16_t current_pos_mm = 0;  				//track position from home
 
+static void move_to(uint16_t position_mm, MachineState next_state,
+		const char *message) {
+	uint16_t dist = (position_mm > current_pos_mm) ?
+			position_mm - current_pos_mm : current_pos_mm - position_mm;
+	uint8_t dir = (position_mm > current_pos_mm) ? CW : CCW;
+
+	state = next_state;
+	i2c_clear_queue();
+	lcd_clear_nb();
+	lcd_set_cursor_nb(0, 0);
+	lcd_print_nb(message);
+	bar_counter = 0;
+	moveMM(dist, TWO_SECOND, dir);
+}
+
+static void move_to_first_ingredient(void) {
+	const Ingredient *ing = &drink_menu[selected_drink].ingredients[0];
+	move_to(ing->position_mm, STATE_MOVING_TO_NEXT, "Moving...");
+}
+
 static void updateProgressBar(void) {
 	bar_counter++;
 	if (bar_counter >= 5000) {
 		bar_counter = 0;
-		lcd_progress_bar(steps_total - steps_remaining, steps_total);
+		if (state == STATE_POURING || state == STATE_PURGING) {
+			lcd_progress_bar(pourElapsedMs(), pourDurationMs());
+		} else {
+			lcd_progress_bar(steps_total - steps_remaining, steps_total);
+		}
 	}
 }
 
@@ -72,6 +97,7 @@ int main(void) {
 	stepperInit();
 	initButtons();
 	motorControlInit();
+	valveInit();
 
 	show_idle_screen();
 
@@ -87,26 +113,16 @@ int main(void) {
 			EXTI->IMR |= EXTI_IMR_MR8;
 		}
 
-		//btn9 = start pouring sequence with moving to ice
+		//btn9 = start pouring sequence at the ice machine
 		if (btn9 && state == STATE_IDLE) {
 		    btn9 = 0;
 		    current_ingredient = 0;
-		    state = STATE_MOVING_TO_ICE;
-
-		    uint16_t dist = ICE_MACHINE_MM - current_pos_mm;  // 245 - 0 = 245 from home
-		    uint8_t dir = (ICE_MACHINE_MM > current_pos_mm) ? CW : CCW;
-
-		    i2c_clear_queue();
-		    lcd_clear_nb();
-		    lcd_set_cursor_nb(0, 0);
-		    lcd_print_nb("Moving to ice...");
-		    bar_counter = 0;
-
-		    moveMM(dist, TWO_SECOND, dir);
+		    move_to(ICE_MACHINE_MM, STATE_MOVING_TO_ICE, "Moving to ice...");
 		}
 
 		//update progress bar while moving
-		if (state == STATE_MOVING_TO_ICE || state == STATE_MOVING_TO_NEXT
+		if (state == STATE_MOVING_TO_VALVE || state == STATE_MOVING_TO_ICE
+				|| state == STATE_MOVING_TO_NEXT
 		        || state == STATE_RETURNING_HOME || state == STATE_POURING
 		        || state == STATE_PURGING) {
 			if (!stepper_done && steps_remaining > 50) {
@@ -127,6 +143,7 @@ int main(void) {
 				lcd_clear_nb();
 				lcd_set_cursor_nb(0, 0);
 				lcd_print_nb("Clear hose...");
+				bar_counter = 0;
 
 				pourDrink(ing->motor_id, PURGE_MS, 0);
 
@@ -183,7 +200,18 @@ int main(void) {
 				&& state != STATE_PURGING) {
 			stepper_done = 0;
 
-			    if (state == STATE_MOVING_TO_ICE) {
+			    if (state == STATE_MOVING_TO_VALVE) {
+					current_pos_mm = VALVE_1_MM;
+
+					lcd_set_cursor_nb(0, 0);
+					lcd_print_nb("Dispensing...   ");
+					valveOn(1);
+					delayStkMs(VALVE_MS);
+					valveOff(1);
+
+					move_to_first_ingredient();
+
+			    } else if (state == STATE_MOVING_TO_ICE) {
 			        // Arrived at ice machine
 			        current_pos_mm = ICE_MACHINE_MM;
 
@@ -201,22 +229,12 @@ int main(void) {
 
 			        motorOff();
 
-			        // Now move to first ingredient
-			        state = STATE_MOVING_TO_NEXT;
-			        const Ingredient *ing = &drink_menu[selected_drink].ingredients[0];
-
-			        uint16_t dist = (ing->position_mm > current_pos_mm) ?
-			                         ing->position_mm - current_pos_mm :
-			                         current_pos_mm - ing->position_mm;
-			        uint8_t dir = (ing->position_mm > current_pos_mm) ? CW : CCW;
-
-			        i2c_clear_queue();
-			        lcd_clear_nb();
-			        lcd_set_cursor_nb(0, 0);
-			        lcd_print_nb("Moving...");
-			        bar_counter = 0;
-
-			        moveMM(dist, TWO_SECOND, dir);
+			        if (drink_menu[selected_drink].includes_valve_1) {
+						move_to(VALVE_1_MM, STATE_MOVING_TO_VALVE,
+								"Moving to valve");
+			        } else {
+						move_to_first_ingredient();
+			        }
 
 			    } else if (state == STATE_RETURNING_HOME) {
 			        current_pos_mm = 0;
@@ -235,6 +253,7 @@ int main(void) {
 			        lcd_clear_nb();
 			        lcd_set_cursor_nb(0, 0);
 			        lcd_print_nb("Pouring...");
+			        bar_counter = 0;
 
 			        pourDrink(ing->motor_id, ing->pour_ms, 1);
 			    }

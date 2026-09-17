@@ -48,6 +48,7 @@ add_executable(${PROJECT_NAME}
     Src/syscalls.c
     Src/sysmem.c
     Src/system_stm32f1xx.c
+    Src/valve.c
     Startup/startup_stm32f103c8tx.s
 )
 
