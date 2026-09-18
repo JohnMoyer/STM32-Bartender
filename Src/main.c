@@ -18,7 +18,7 @@
 #define THREE_SECOND 			3000
 
 #define PURGE_MS 				3000
-#define VALVE_MS 				4000
+#define VALVE_MS 				8000
 
 #define ICE_MACHINE_MM 			225
 #define VALVE_1_MM 				533
