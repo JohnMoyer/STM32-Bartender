@@ -10,6 +10,8 @@ Physical designing: **Isaac Wolf, Talan Luedtke**
 TODO
 
 ## Documentation
+- [Complete hardware and MCU peripheral block diagram (draw.io XML)](docs/stm32-bartender.drawio)
+- [Diagram guide, source coverage and hardware details to confirm](docs/hardware-diagram.md)
 - [Datasheet](https://www.st.com/resource/en/datasheet/stm32f103c8.pdf)
 - [Programming Manual](https://www.st.com/resource/en/programming_manual/pm0056-stm32f10xxx20xxx21xxxl1xxxx-cortexm3-programming-manual-stmicroelectronics.pdf)
 - [Reference Manual](https://www.st.com/resource/en/reference_manual/rm0008-stm32f101xx-stm32f102xx-stm32f103xx-stm32f105xx-and-stm32f107xx-advanced-armbased-32bit-mcus-stmicroelectronics.pdf)
