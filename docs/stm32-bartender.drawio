@@ -354,7 +354,7 @@
                 <mxCell id="cell3_1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;spacing=14;fontSize=16;fontFamily=Helvetica;fillColor=#f4f5f7;strokeColor=#8b94a1;strokeWidth=1.5;rounded=0;fontStyle=0;fontSize=13;spacing=8;" value="&lt;b&gt;GPIO output PP 50 MHz&lt;/b&gt;" vertex="1">
                     <mxGeometry height="43" width="295" x="200" y="349" as="geometry"/>
                 </mxCell>
-                <mxCell id="cell3_2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;spacing=14;fontSize=16;fontFamily=Helvetica;fillColor=#f4f5f7;strokeColor=#8b94a1;strokeWidth=1.5;rounded=0;fontStyle=0;fontSize=13;spacing=8;" value="&lt;b&gt;DC motor IN2; also initialized by stepperInit&lt;/b&gt;" vertex="1">
+                <mxCell id="cell3_2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;spacing=14;fontSize=16;fontFamily=Helvetica;fillColor=#f4f5f7;strokeColor=#8b94a1;strokeWidth=1.5;rounded=0;fontStyle=0;fontSize=13;spacing=8;" value="&lt;b&gt;DC motor IN2&lt;/b&gt;" vertex="1">
                     <mxGeometry height="43" width="560" x="495" y="349" as="geometry"/>
                 </mxCell>
                 <mxCell id="cell3_3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;spacing=14;fontSize=16;fontFamily=Helvetica;fillColor=#f4f5f7;strokeColor=#8b94a1;strokeWidth=1.5;rounded=0;fontStyle=0;fontSize=13;spacing=8;" value="&lt;b&gt;motor.c&lt;/b&gt;" vertex="1">
@@ -503,9 +503,6 @@
                 </mxCell>
                 <mxCell id="cell15_3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;spacing=14;fontSize=16;fontFamily=Helvetica;fillColor=#f4f5f7;strokeColor=#8b94a1;strokeWidth=1.5;rounded=0;fontStyle=0;fontSize=13;spacing=8;" value="&lt;b&gt;ledtest.c&lt;/b&gt;" vertex="1">
                     <mxGeometry height="43" width="245" x="1055" y="865" as="geometry"/>
-                </mxCell>
-                <mxCell id="pa2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;spacing=14;fontSize=16;fontFamily=Helvetica;fillColor=#fde8e7;strokeColor=#bb5450;strokeWidth=1.5;" value="&lt;b&gt;PA2 ownership conflict&lt;/b&gt;&lt;br&gt;&lt;br&gt;motorControlInit configures PA2 as IN1.&lt;br&gt;Stepper start/stop code also drives PA2 low/high.&lt;br&gt;An electrical / firmware mapping decision is needed;&lt;br&gt;the diagram preserves both uses found in source." vertex="1">
-                    <mxGeometry height="150" width="520" x="1360" y="175" as="geometry"/>
                 </mxCell>
                 <mxCell id="selectoractual" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=middle;spacing=14;fontSize=16;fontFamily=Helvetica;fillColor=#fde8e7;strokeColor=#bb5450;strokeWidth=1.5;" value="&lt;b&gt;(*) Selector pins are actually open-drain&lt;/b&gt;&lt;br&gt;&lt;br&gt;initSelector() ORs 0x2222 into reset CRH = 0x44444444.&lt;br&gt;PB12–PB15 nibbles become 0x6, not 0x2:&lt;br&gt;MODE = 10 (2 MHz); CNF = 01 (open-drain).&lt;br&gt;Writing HIGH releases the pin; external pull-ups&lt;br&gt;and compatible logic levels are not documented.&lt;br&gt;The initial clear uses 0x8 &lt;&lt; 13, not a 3-bit mask." vertex="1">
                     <mxGeometry height="200" width="520" x="1360" y="355" as="geometry"/>
