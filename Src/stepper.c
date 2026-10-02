@@ -92,8 +92,6 @@ static void startMove(uint32_t steps, uint32_t delayUs, uint8_t dir) {
 	state = STEPPER_RAMP_UP;
 	stepper_done = 0;
 
-	GPIOA->BSRR = GPIO_BSRR_BR2;							//EN low (enable driver)
-
 	TIM2->ARR = max_arr;
 	TIM2->CNT = 0;
 	TIM2->CR1 |= TIM_CR1_CEN_Msk;
@@ -125,8 +123,6 @@ static void startPour(uint32_t steps, uint8_t dir) {
 
     state        = STEPPER_CRUISE;  //start directly in cruise
     stepper_done = 0;
-
-    GPIOA->BSRR = GPIO_BSRR_BR2;
 
     TIM2->ARR = POUR_ARR;
     TIM2->CNT = 0;
@@ -183,7 +179,6 @@ void TIM2_IRQHandler(void) {
 
     if (steps_remaining == 0  && state != STEPPER_CRUISE) {
         TIM2->CR1 &= ~TIM_CR1_CEN_Msk;     // stop timer
-        GPIOA->BSRR = GPIO_BSRR_BS2;       // EN high (disable)
         state        = STEPPER_IDLE;
         stepper_done = 1;
         return;
@@ -216,7 +211,6 @@ void TIM2_IRQHandler(void) {
 
     if (steps_remaining == 0 && state != STEPPER_CRUISE) {								//Move is done
         TIM2->CR1 &= ~TIM_CR1_CEN_Msk;
-        GPIOA->BSRR = GPIO_BSRR_BS2;
         state        = STEPPER_IDLE;
         stepper_done = 1;
         disableSelector();
@@ -235,7 +229,6 @@ void TIM3_IRQHandler(void) {
     TIM2->CR1 &= ~TIM_CR1_CEN_Msk;
 
     GPIOA->BSRR = GPIO_BSRR_BR1;  // STEP low
-    GPIOA->BSRR = GPIO_BSRR_BS2;  // disable driver
 
     disableSelector();
 

@@ -26,7 +26,6 @@ The diagram reflects repository baseline `8324f4f`, reviewed on 2026-09-21. It d
 
 ## Details requiring hardware confirmation
 
-- **PA2 has conflicting uses:** stepper code writes it as active-low driver enable; motor code configures and writes it as DC direction IN1. Both are shown.
 - **PB12–PB15 become open-drain:** `initSelector()` ORs `0x2222` into reset register nibbles of `0x4`, yielding `0x6` (2 MHz open-drain). External pull-ups are not documented. The initial selector clear also uses `0x8 << 13`, rather than the three address bits.
 - **Selector hardware is unknown:** its chip, output polarity and STEP-versus-enable routing cannot be reconstructed from the GPIO API alone. A4988s are identified by the user request; four logical channels are referenced by normal recipes, but installed driver quantity is not documented. Channels 4–7 are shown as unused addresses.
 - **DC driver comments are ambiguous:** the source links to a SparkFun TB6612FNG board but also names “TB303A1”; comments do not establish a reliable A/B channel pairing. The diagram does not turn these comments into a channel-paralleling schematic.
