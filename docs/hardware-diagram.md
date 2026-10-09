@@ -7,7 +7,6 @@ Open [stm32-bartender.drawio](stm32-bartender.drawio) in diagrams.net / draw.io 
 3. **Clocks, timers and interrupts:** RCC, TIM1–TIM4, SysTick, I2C1, AFIO/EXTI, NVIC and application control flow.
 4. **Pin inventory, power and open details:** every configured application pin, SWD pins, actual GPIO modes, supply domains and unresolved hardware details.
 
-The diagram reflects repository baseline `8324f4f`, reviewed on 2026-09-21. It documents current source behavior; firmware was not changed. Dashed connections identify functional relationships whose physical wiring is unconfirmed.
 
 ## Evidence and coverage
 
@@ -22,17 +21,8 @@ The diagram reflects repository baseline `8324f4f`, reviewed on 2026-09-21. It d
 | `Src/valve.c`, `Inc/valve.h` | PA4 active-high valve control |
 | `Src/ledtest.c`, `Src/delay.c` | PC13 board LED and polled SysTick delays |
 | `README.md` | ST-Link, PA13/PA14, optional 3.3 V power and BOOT0 |
-| Startup code, remaining application files and build source list | Checked for additional peripheral use; weak vector entries and library syscall stubs do not establish use |
+| Startup code, remaining application files and build source list | 
 
-## Details requiring hardware confirmation
-
-- **PB12–PB15 become open-drain:** `initSelector()` ORs `0x2222` into reset register nibbles of `0x4`, yielding `0x6` (2 MHz open-drain). External pull-ups are not documented. The initial selector clear also uses `0x8 << 13`, rather than the three address bits.
-- **Selector hardware is unknown:** its chip, output polarity and STEP-versus-enable routing cannot be reconstructed from the GPIO API alone. A4988s are identified by the user request; four logical channels are referenced by normal recipes, but installed driver quantity is not documented. Channels 4–7 are shown as unused addresses.
-- **DC driver comments are ambiguous:** the source links to a SparkFun TB6612FNG board but also names “TB303A1”; comments do not establish a reliable A/B channel pairing. The diagram does not turn these comments into a channel-paralleling schematic.
-- **Other external details are missing:** valve power stage, LCD backpack part, supply voltages, pull-up values, A4988 microstep/reset/sleep straps, current limits and motor winding connections.
-- **Interrupt distinctions matter:** TIM4 and SysTick are polled; TIM3 is used for dispensing duration, despite an old button-debounce comment. The I2C error handler and NVIC line exist, but `CR2.ITERREN` is not enabled.
-
-No sensor or homing feedback is configured. The diagram's application sequence is an overview, not a validation of every state-machine edge case. Timer frequencies are derived from register settings and the nominal clock, not measured on hardware.
 
 ## Component references
 
@@ -40,4 +30,3 @@ No sensor or homing feedback is configured. The diagram's application sequence i
 - [Allegro A4988 datasheet](https://www.allegromicro.com/~/media/Files/Datasheets/A4988-Datasheet.pdf): STEP/DIR/enable, microstep/reset/sleep inputs, phase outputs and local supply/current-setting connections.
 - [SparkFun TB6612FNG motor driver](https://www.sparkfun.com/sparkfun-motor-driver-dual-tb6612fng-1a.html): the board linked in `Src/motor.c`; this identifies the referenced product, not a verified installed board.
 
-The XML was checked for valid structure, unique cell IDs, connector endpoints, page bounds and coverage of the application peripheral/pin inventory. Physical hardware wiring has not been verified.
