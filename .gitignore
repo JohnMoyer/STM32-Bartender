@@ -25,3 +25,8 @@ Drivers/STM32F1xx_HAL_Driver/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Altium Generated Files
+History/
+__Previews/
+*.PrjPcbStructure
