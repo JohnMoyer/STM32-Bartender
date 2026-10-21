@@ -6,8 +6,7 @@ Physical designing: **Isaac Wolf, Talan Luedtke**
 - wolfi@msoe.edu
 - luedtket@msoe.edu
 
-## Purpose
-TODO
+<img width="576" height="768" alt="image" src="https://github.com/user-attachments/assets/5fce5584-a57a-4cb3-89b4-29785947fd76" />
 
 ## Documentation
 - [Complete hardware and MCU peripheral block diagram (draw.io XML)](docs/stm32-bartender.drawio)
